@@ -2,13 +2,16 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-
+import 'package:flutter/services.dart'; // Para Clipboard
+// import 'package:intl/intl.dart'; // No se usa directamente aquí, pero puede ser útil en otras partes
 import 'package:internet_connection_checker/internet_connection_checker.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+// Asegúrate que estas rutas sean correctas para tu estructura de proyecto
+import 'package:runi/db.dart';
+import 'package:runi/wizard.dart'; // Solo para el tipo WizardScreen
+import 'package:url_launcher/url_launcher.dart'; // Para abrir URLs
 
-import 'package:runi/db.dart'; 
-import 'package:runi/wizard.dart';
-
-
+// Screen principal que contiene el BottomNavigationBar y las diferentes vistas/pestañas
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
 
@@ -21,7 +24,7 @@ class _MainScreenState extends State<MainScreen> {
 
   static final List<Widget> _pages = <Widget>[
     HomeContent(),
-    ToolsContent(),
+    ToolsContent(), // Esta es la pestaña "Generar Logo"
     ProfileContent(),
     SettingsContent(),
   ];
@@ -321,7 +324,7 @@ class _HomeContentState extends State<HomeContent> {
   }
 }
 
-
+// --- Contenido de la Pestaña Herramientas (Ahora "Generar Logo") ---
 class ToolsContent extends StatelessWidget {
   const ToolsContent({super.key});
 
@@ -343,7 +346,7 @@ class ToolsContent extends StatelessWidget {
   }
 }
 
-
+// --- Pantalla: SelectProjectForLogoPromptScreen (CORREGIDA) ---
 class SelectProjectForLogoPromptScreen extends StatefulWidget {
   final Color buttonColor;
   final Color textColor;
@@ -570,12 +573,12 @@ class _SelectProjectForLogoPromptScreenState
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => LogoStyleQuestionScreen(
+        builder: (_) => LogoConfigurationScreen(
           nombreEmpresa: nombreEmpresa,
           coloresSugeridos: coloresSugeridos,
           accentColor: widget.buttonColor,
           textColor: widget.textColor,
-          buttonTextColor: Colors.black87,
+          buttonTextColor: Colors.black87, // O el color que prefieras para el texto de los botones/chips seleccionados
         ),
       ),
     );
@@ -664,7 +667,7 @@ class _SelectProjectForLogoPromptScreenState
         iconData: Icons.cloud_off_rounded,
         message: "No tienes proyectos en la nube",
         subMessage: "Crea un proyecto y genera su identidad de marca para verlo aquí, o asegúrate que tus proyectos existentes tengan la información necesaria.",
-        onButtonPressed: _loadUserAndProjectsFromFirestore,
+        onButtonPressed: _checkInternetAndLoadData,
         buttonText: "Recargar Proyectos"
       );
     }
@@ -736,7 +739,7 @@ class _SelectProjectForLogoPromptScreenState
                   child: IconButton(
                     icon: Icon(Icons.refresh_rounded, color: widget.textColor.withOpacity(0.8), size: 26,),
                     onPressed: _loadUserAndProjectsFromFirestore, 
-                    padding: EdgeInsets.all(12), 
+                    padding: EdgeInsets.all(12),
                     splashRadius: 24,
                   ),
                 ),
@@ -758,14 +761,15 @@ class _SelectProjectForLogoPromptScreenState
 }
 
 
-class LogoStyleQuestionScreen extends StatelessWidget {
+// --- Pantalla: LogoConfigurationScreen (NUEVA) ---
+class LogoConfigurationScreen extends StatefulWidget {
   final String nombreEmpresa;
   final String coloresSugeridos;
   final Color accentColor;
   final Color textColor;
   final Color buttonTextColor;
 
-  const LogoStyleQuestionScreen({
+  const LogoConfigurationScreen({
     Key? key,
     required this.nombreEmpresa,
     required this.coloresSugeridos,
@@ -775,28 +779,274 @@ class LogoStyleQuestionScreen extends StatelessWidget {
   }) : super(key: key);
 
   @override
+  _LogoConfigurationScreenState createState() => _LogoConfigurationScreenState();
+}
+
+class _LogoConfigurationScreenState extends State<LogoConfigurationScreen> {
+  // Opciones
+  final List<String> _estilosPrincipales = [
+    "Minimalista", "Moderno", "Abstracto", "Geométrico", "Orgánico",
+    "Vintage/Retro", "Ilustrativo", "Tipográfico", "Emblema", "Isométrico",
+    "Estilo Neón", "Diseño Plano (Flat)", "Arte Lineal (Line Art)",
+    "Acuarela Digital", "Tecnológico", "Juguetón"
+  ];
+  String? _selectedEstiloPrincipal;
+
+  final List<String> _tiposDeLogo = [
+    "Nominativo", "No nominativo", "Combinado/Mixto"
+  ];
+  String? _selectedTipoDeLogo;
+
+  final List<String> _formasPredominantes = [
+    "Circular", "Cuadrado", "Triangular", "Rectangular", "Ovalado",
+    "Formas Libres/Orgánicas", "Lineal", "Basado en Escudo/Emblema", "Hexagonal"
+  ];
+  final Set<String> _selectedFormas = {};
+
+  final TextEditingController _conceptosAdicionalesController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedEstiloPrincipal = _estilosPrincipales.first; // Valor por defecto
+    _selectedTipoDeLogo = _tiposDeLogo.first; // Valor por defecto
+  }
+
+  @override
+  void dispose() {
+    _conceptosAdicionalesController.dispose();
+    super.dispose();
+  }
+
+  void _generarPrompt() {
+    if (_selectedEstiloPrincipal == null) {
+      _showErrorSnackBar("Por favor, elige un estilo principal.");
+      return;
+    }
+    if (_selectedTipoDeLogo == null) {
+      _showErrorSnackBar("Por favor, selecciona un tipo de logo.");
+      return;
+    }
+
+    String prompt = "Crear un logo para la marca \"${widget.nombreEmpresa}\".\n\n";
+    prompt += "Estilo principal: $_selectedEstiloPrincipal.\n";
+    prompt += "Tipo de logo: $_selectedTipoDeLogo.\n";
+
+    if (_selectedFormas.isNotEmpty) {
+      prompt += "Formas predominantes: ${_selectedFormas.join(', ')}.\n";
+    } else {
+      prompt += "Formas predominantes: Elige las más adecuadas según el estilo y concepto.\n";
+    }
+
+    prompt += "Colores base sugeridos: ${widget.coloresSugeridos}.\n";
+
+    if (_conceptosAdicionalesController.text.trim().isNotEmpty) {
+      prompt += "Elementos o conceptos adicionales a incorporar: ${_conceptosAdicionalesController.text.trim()}.\n";
+    }
+
+    prompt += "\nConsideraciones importantes según el tipo de logo:\n";
+    if (_selectedTipoDeLogo == "Nominativo") {
+      prompt += "- El nombre de la marca \"${widget.nombreEmpresa}\" debe ser el elemento central y legible del logo. Puede incluir elementos gráficos sutiles de apoyo.\n";
+    } else if (_selectedTipoDeLogo == "No nominativo") {
+      prompt += "- Crear un isotipo o símbolo distintivo que represente la marca sin incluir el nombre \"${widget.nombreEmpresa}\". El diseño debe ser memorable y escalable.\n";
+    } else if (_selectedTipoDeLogo == "Combinado/Mixto") {
+      prompt += "- Diseñar un logo que integre tanto el nombre de la marca \"${widget.nombreEmpresa}\" como un isotipo/símbolo. Ambos elementos deben poder funcionar juntos y, opcionalmente, por separado.\n";
+    }
+
+    prompt += "\nEl resultado debe ser un diseño de logo profesional, adecuado para la identidad de marca descrita. Presentar el logo sobre un fondo blanco o neutro para una clara visualización.";
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ShowLogoPromptScreen(
+          prompt: prompt,
+          accentColor: widget.accentColor,
+          textColor: widget.textColor,
+          buttonTextColor: widget.buttonTextColor,
+        ),
+      ),
+    );
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: TextStyle(color: Colors.white)),
+        backgroundColor: Colors.redAccent,
+      ),
+    );
+  }
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 20.0, bottom: 10.0),
+      child: Text(
+        title,
+        style: TextStyle(
+            color: widget.textColor, fontSize: 17, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  Widget _buildChoiceChipGroup<T>(
+      String title, List<T> items, T? selectedItem, ValueChanged<T?> onChanged,
+      {bool allowMultiple = false, Set<T>? multipleSelectedItems, ValueChanged<T>? onMultipleChanged}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionTitle(title),
+        Wrap(
+          spacing: 8.0,
+          runSpacing: 4.0,
+          children: items.map((item) {
+            final bool isSelected;
+            if (allowMultiple) {
+              isSelected = multipleSelectedItems?.contains(item) ?? false;
+            } else {
+              isSelected = selectedItem == item;
+            }
+            return ChoiceChip(
+              label: Text(item.toString()),
+              selected: isSelected,
+              onSelected: (selected) {
+                if (allowMultiple && onMultipleChanged != null) {
+                  onMultipleChanged(item); 
+                } else {
+                  onChanged(selected ? item : null);
+                }
+              },
+              backgroundColor: const Color(0xFF2C2C3A), 
+              selectedColor: widget.accentColor, 
+              labelStyle: TextStyle(color: isSelected ? widget.buttonTextColor : widget.textColor.withOpacity(0.9), fontSize: 14),
+              checkmarkColor: widget.buttonTextColor,
+              padding: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 8.0),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20.0),
+                side: BorderSide(
+                  color: isSelected ? widget.accentColor : Colors.grey.shade700,
+                  width: 1,
+                ),
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final Color appBarTextColor = widget.buttonTextColor; 
+    
     return Scaffold(
       backgroundColor: const Color(0xFF1E1E2C),
       appBar: AppBar(
-        title: Text("Estilo de Logo para ${nombreEmpresa}", style: TextStyle(color: buttonTextColor)),
-        backgroundColor: accentColor,
-        iconTheme: IconThemeData(color: buttonTextColor),
-        ),
-      body: Center(child: Padding(
+        title: Text("Configurar Logo", style: TextStyle(color: appBarTextColor)),
+        backgroundColor: widget.accentColor,
+        iconTheme: IconThemeData(color: appBarTextColor),
+      ),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
-        child: Text("Pantalla de Estilo de Logo\nNombre: $nombreEmpresa\nColores: $coloresSugeridos", style: TextStyle(color: textColor, fontSize: 18), textAlign: TextAlign.center,),
-      )),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+             Padding(
+              padding: const EdgeInsets.only(bottom: 4.0, top: 4.0),
+              child: Text(
+                "Marca: ${widget.nombreEmpresa}",
+                style: TextStyle(
+                    color: widget.textColor.withOpacity(0.9),
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12.0),
+              child: Text(
+                "Colores base: ${widget.coloresSugeridos}",
+                style: TextStyle(
+                    color: widget.textColor.withOpacity(0.7), fontSize: 14),
+              ),
+            ),
+            Divider(color: widget.textColor.withOpacity(0.2)),
+
+            _buildChoiceChipGroup<String>(
+              "1. Elige el estilo principal:",
+              _estilosPrincipales,
+              _selectedEstiloPrincipal,
+              (value) => setState(() => _selectedEstiloPrincipal = value),
+            ),
+
+            _buildChoiceChipGroup<String>(
+              "2. Selecciona el tipo de logo:",
+              _tiposDeLogo,
+              _selectedTipoDeLogo,
+              (value) => setState(() => _selectedTipoDeLogo = value),
+            ),
+
+            _buildChoiceChipGroup<String>(
+              "3. Elige formas predominantes (puedes seleccionar más de uno):",
+              _formasPredominantes,
+              null, 
+              (value){}, 
+              allowMultiple: true,
+              multipleSelectedItems: _selectedFormas,
+              onMultipleChanged: (forma) {
+                setState(() {
+                  if (_selectedFormas.contains(forma)) {
+                    _selectedFormas.remove(forma);
+                  } else {
+                    _selectedFormas.add(forma);
+                  }
+                });
+              }
+            ),
+
+            _buildSectionTitle("4. Elementos o conceptos adicionales (opcional):"),
+            TextField(
+              controller: _conceptosAdicionalesController,
+              style: TextStyle(color: widget.textColor, fontSize: 15),
+              decoration: InputDecoration(
+                hintText: "Ej: 'un águila estilizada', 'símbolo de infinito', 'conexión y tecnología', 'naturaleza y crecimiento'",
+                hintStyle: TextStyle(color: widget.textColor.withOpacity(0.5), fontSize: 14),
+                filled: true,
+                fillColor: const Color(0xFF2C2C3A),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8.0),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              ),
+              maxLines: 3,
+            ),
+
+            const SizedBox(height: 30),
+            Center(
+              child: ElevatedButton.icon(
+                icon: Icon(Icons.auto_awesome, color: widget.buttonTextColor),
+                label: Text("Generar Prompt", style: TextStyle(color: widget.buttonTextColor, fontSize: 16)),
+                onPressed: _generarPrompt,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: widget.accentColor,
+                  padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
+      ),
     );
   }
 }
 
-
+// --- Pantalla: ShowLogoPromptScreen (MODIFICADA) ---
 class ShowLogoPromptScreen extends StatelessWidget {
   final String prompt;
   final Color accentColor;
   final Color textColor;
-  final Color buttonTextColor;
+  final Color buttonTextColor; // Este será el color del texto del botón de copiar
 
   const ShowLogoPromptScreen({
     Key? key,
@@ -806,24 +1056,136 @@ class ShowLogoPromptScreen extends StatelessWidget {
     required this.buttonTextColor,
   }) : super(key: key);
 
+  final List<Map<String, String>> _iaTools = const [
+    {'name': 'Microsoft Copilot (DALL·E 3)', 'url': 'https://copilot.microsoft.com/'},
+    {'name': 'Looka AI Logo Maker', 'url': 'https://looka.com/logo-maker/'},
+    {'name': 'Canva AI Logo Maker', 'url': 'https://www.canva.com/ai-logo-maker/'},
+    {'name': 'Ideogram.ai', 'url': 'https://ideogram.ai/'},
+    {'name': 'Adobe Firefly', 'url': 'https://firefly.adobe.com/'},
+    {'name': 'Leonardo.Ai', 'url': 'https://leonardo.ai/'},
+    {'name': 'Bing Image Creator', 'url': 'https://www.bing.com/images/create'},
+  ];
+
+  Future<void> _launchURL(String urlString) async {
+    final Uri url = Uri.parse(urlString);
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      print('Could not launch $urlString');
+      // Consider showing a SnackBar to the user
+      // ScaffoldMessenger.of(context).showSnackBar(
+      //   SnackBar(content: Text('No se pudo abrir $urlString', style: TextStyle(color: textColor)), backgroundColor: Colors.redAccent),
+      // );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-     return Scaffold(
+    final Color appBarTextColor = buttonTextColor;
+
+    return Scaffold(
       backgroundColor: const Color(0xFF1E1E2C),
       appBar: AppBar(
-        title: Text("Prompt Generado", style: TextStyle(color: buttonTextColor)),
+        title: Text("Prompt para Logo", style: TextStyle(color: appBarTextColor)),
         backgroundColor: accentColor,
-        iconTheme: IconThemeData(color: buttonTextColor),
-        ),
-      body: Padding(
+        iconTheme: IconThemeData(color: appBarTextColor),
+        // Se elimina el IconButton de copiar de aquí
+      ),
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
-        child: SingleChildScrollView(child: SelectableText(prompt, style: TextStyle(color: textColor, fontSize: 16))),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch, // Para que el botón ocupe el ancho
+          children: [
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(
+                color: accentColor.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: accentColor.withOpacity(0.7))
+              ),
+              child: Text(
+                "IMPORTANTE: SE PONE EL NOMBRE DEL PROYECTO COMO MARCA. DE SER NECESARIO CAMBIALO AL PEGAR EL PROMPT EN UNA DE LAS PÁGINAS SUGERIDAS.",
+                style: TextStyle(
+                    color: accentColor,
+                    fontSize: 13.5,
+                    fontWeight: FontWeight.w500,
+                    height: 1.3),
+                textAlign: TextAlign.center,
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12.0),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2C2C3A),
+                borderRadius: BorderRadius.circular(8.0),
+              ),
+              child: SelectableText(
+                prompt,
+                style: TextStyle(color: textColor, fontSize: 15, height: 1.5),
+              ),
+            ),
+            const SizedBox(height: 16), // Espacio entre el prompt y el botón
+            ElevatedButton.icon(
+              icon: Icon(Icons.copy_all_outlined, color: buttonTextColor),
+              label: Text("Copiar Prompt", style: TextStyle(color: buttonTextColor, fontSize: 16)),
+              onPressed: () {
+                Clipboard.setData(ClipboardData(text: prompt));
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                      content: Text("Prompt copiado al portapapeles", style: TextStyle(color: textColor)), // Usamos textColor general para el mensaje
+                      backgroundColor: Colors.green.shade700.withOpacity(0.9),
+                      behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: accentColor,
+                padding: const EdgeInsets.symmetric(vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                elevation: 2,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              "Plataformas de IA Recomendadas:",
+              style: TextStyle(
+                  color: textColor, fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: _iaTools.length,
+              itemBuilder: (context, index) {
+                final tool = _iaTools[index];
+                return Card(
+                  color: const Color(0xFF2C2C3A),
+                  margin: const EdgeInsets.symmetric(vertical: 5.0),
+                  elevation: 1,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor: accentColor.withOpacity(0.15),
+                      child: Icon(Icons.auto_fix_high,
+                          color: accentColor, size: 22),
+                    ),
+                    title: Text(tool['name']!, style: TextStyle(color: textColor, fontWeight: FontWeight.w500, fontSize: 15)),
+                    trailing: Icon(Icons.open_in_new_rounded, color: textColor.withOpacity(0.7), size: 20),
+                    onTap: () => _launchURL(tool['url']!),
+                    contentPadding: const EdgeInsets.symmetric(vertical: 6, horizontal: 16),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 20),
+          ],
+        ),
       ),
     );
   }
 }
 
 
+// --- Clases ProfileContent, SettingsContent, SettingsDetailPage ---
 class ProfileContent extends StatefulWidget {
   const ProfileContent({super.key});
 
@@ -835,7 +1197,7 @@ class _ProfileContentState extends State<ProfileContent> {
   Map<String, dynamic>? _currentUser;
   bool _isLoading = true;
 
-  // final GoogleSignIn _googleSignIn = GoogleSignIn(); // No se usa aquí directamente
+  final GoogleSignIn _googleSignIn = GoogleSignIn();
 
   final Color _profileCardColor = Colors.white24;
   final Color _profileTextColor = Colors.white;
@@ -866,9 +1228,12 @@ class _ProfileContentState extends State<ProfileContent> {
 
   void _logout(BuildContext context) async {
     try {
-      // await _googleSignIn.signOut(); // Si usas Google Sign In, asegúrate que la instancia sea la correcta.
+      await _googleSignIn.signOut();
+      print("Intento de cierre de sesión de GoogleSignIn completado.");
       await FirebaseAuth.instance.signOut();
+      print("Sesión de Firebase Auth cerrada.");
       await DBHelper.cerrarSesion();
+      print("Sesión local de DBHelper cerrada.");
       if (mounted) {
         Navigator.pushNamedAndRemoveUntil(context, '/', (Route<dynamic> route) => false);
       }
