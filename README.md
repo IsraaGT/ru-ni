@@ -18,9 +18,6 @@ Generador de prompts para logotipos para diferentes IA especializadas en ello.
 📊 Análisis de Coherencia de Marca
 Evaluación automática que garantiza que todos los elementos visuales generados mantengan consistencia con la identidad definida, asegurando una imagen corporativa profesional y cohesiva.
 
-💾 Exportación Multiplataforma
-Descarga de logotipos en múltiples formatos (PNG, SVG, PDF) y resoluciones, optimizados para uso digital, impreso y redes sociales.
-
 📱 Interfaz Intuitiva
 Diseño centrado en el usuario que guía paso a paso el proceso de creación, eliminando la complejidad técnica y haciendo accesible el diseño profesional.
 
