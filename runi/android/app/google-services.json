@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "100470635478",
+    "project_id": "runi-25130",
+    "storage_bucket": "runi-25130.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:100470635478:android:d201957a06a5f50e064277",
+        "android_client_info": {
+          "package_name": "com.example.runi"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "100470635478-6upe5isbgnu2ik9ef0q57bcdfrav49h4.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.runi",
+            "certificate_hash": "f866928eb6abb44fd6aa858110a0e9e4d05ab201"
+          }
+        },
+        {
+          "client_id": "100470635478-v3lbl0vm63b1p8imh1ok900hk2jktip8.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCaj1dE5JK3_EtgwjXyIV4eEh3YcjIkD5E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "100470635478-v3lbl0vm63b1p8imh1ok900hk2jktip8.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

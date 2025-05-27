@@ -1,0 +1,97 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.example.runi">
+
+    <!-- Permisos de almacenamiento -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" android:maxSdkVersion="28" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+
+
+    <application
+        android:requestLegacyExternalStorage="true"
+        android:label="runi"
+        android:name="${applicationName}"
+        android:icon="@mipmap/launcher_icon">
+        
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:taskAffinity=""
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+
+            <meta-data
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme" />
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+
+    </application>
+
+        <queries>
+        <!-- Para permitir abrir URLs HTTPS (necesario para url_launcher) -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+
+        <!-- Para permitir abrir URLs HTTP (recomendado si alguna vez las necesitas) -->
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="http" />
+        </intent>
+
+        <!-- Para Google Sign In (si lo usas y tu targetSdkVersion es 30+) -->
+        <!-- Aunque el error actual es de url_launcher, es bueno tenerlo si usas Google Sign In -->
+        <intent>
+            <action android:name="com.google.android.gms.auth.api.signin. внутрішньо. SignInActivity" /> <!-- Puede variar ligeramente -->
+            <category android:name="android.intent.category.DEFAULT" />
+        </intent>
+        <!-- O a veces se ve así para Google Sign In más genérico -->
+         <intent>
+            <action android:name="com.google.android.gms.auth.GOOGLE_SIGN_IN" />
+            <category android:name="android.intent.category.DEFAULT" />
+        </intent>
+
+
+        <!-- La que ya tenías para PROCESS_TEXT (mantenla si la sigues usando) -->
+        <intent>
+            <action android:name="android.intent.action.PROCESS_TEXT"/>
+            <data android:mimeType="text/plain"/>
+        </intent>
+
+        <!-- Opcional: Si usas url_launcher para otras acciones, añádelas aquí -->
+        <!-- Ejemplo para emails -->
+        <!-- 
+        <intent>
+            <action android:name="android.intent.action.SENDTO" />
+            <data android:scheme="mailto" />
+        </intent>
+        -->
+        <!-- Ejemplo para llamadas telefónicas -->
+        <!-- 
+        <intent>
+            <action android:name="android.intent.action.DIAL" />
+            <data android:scheme="tel" />
+        </intent>
+        -->
+        <!-- Ejemplo para SMS -->
+        <!--
+        <intent>
+            <action android:name="android.intent.action.SENDTO"/>
+            <data android:scheme="smsto"/>
+        </intent>
+        -->
+    </queries>
+</manifest>
